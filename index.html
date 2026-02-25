@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倒计时 | Countdown Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+        }
+        
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* 玻璃拟态效果 */
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .glass-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .glass-input:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+        
+        /* 数字翻转动画 */
+        @keyframes flipIn {
+            from {
+                transform: rotateX(-90deg);
+                opacity: 0;
+            }
+            to {
+                transform: rotateX(0deg);
+                opacity: 1;
+            }
+        }
+        
+        .flip-number {
+            animation: flipIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* 脉冲动画 */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(99, 102, 241, 0.6);
+            }
+        }
+        
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+        
+        /* 渐变文字 */
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gradient-text-2 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* 粒子画布 */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        
+        /* 按钮悬停效果 */
+        .btn-hover {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-hover::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-hover:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* 完成时的庆祝动画 */
+        @keyframes celebrate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .celebrate {
+            animation: celebrate 0.5s ease-in-out;
+        }
+        
+        .hidden-section {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .visible-section {
+            display: flex;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen flex items-center justify-center relative">
+
+    <!-- 粒子背景 -->
+    <canvas id="particles"></canvas>
+
+    <!-- 主容器 -->
+    <div class="container mx-auto px-4 relative z-10 max-w-6xl">
+        
+        <!-- 标题 -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-7xl font-bold mb-4 tracking-tight">
+                <span class="gradient-text">倒计时</span>
+                <span class="text-gray-400 font-light">Timer</span>
+            </h1>
+            <p class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto">
+                设定目标时间，精确追踪每一刻
+            </p>
+        </div>
+
+        <!-- 设置界面 -->
+        <div id="setup-section" class="visible-section flex-col items-center w-full max-w-md mx-auto">
+            <div class="glass rounded-3xl p-8 w-full space-y-6">
+                <div class="space-y-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">目标时间</label>
+                    <input type="datetime-local" id="target-input" class="glass-input w-full px-4 py-3 rounded-xl text-lg mono">
+                </div>
+                
+                <div class="space-y-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">事件名称（可选）</label>
+                    <input type="text" id="event-input" placeholder="例如：新年倒计时、项目截止..." class="glass-input w-full px-4 py-3 rounded-xl text-lg">
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="setPreset(1)" class="btn-hover glass px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition">
+                        1分钟后
+                    </button>
+                    <button onclick="setPreset(60)" class="btn-hover glass px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition">
+                        1小时后
+                    </button>
+                    <button onclick="setPreset(1440)" class="btn-hover glass px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition">
+                        明天此时
+                    </button>
+                </div>
+
+                <button onclick="startCountdown()" class="btn-hover w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl text-lg shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 pulse-glow">
+                    开始倒计时
+                </button>
+            </div>
+        </div>
+
+        <!-- 倒计时显示界面 -->
+        <div id="countdown-section" class="hidden-section flex-col items-center w-full">
+            <div id="event-display" class="text-2xl md:text-3xl font-light text-gray-300 mb-8 text-center"></div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 w-full max-w-5xl mb-12">
+                <!-- 天 -->
+                <div class="glass rounded-3xl p-6 md:p-8 text-center transform hover:scale-105 transition-transform duration-300">
+                    <div id="days" class="text-5xl md:text-7xl font-bold mono gradient-text mb-2 flip-number">00</div>
+                    <div class="text-gray-400 text-sm md:text-base uppercase tracking-widest">天 Days</div>
+                </div>
+                
+                <!-- 时 -->
+                <div class="glass rounded-3xl p-6 md:p-8 text-center transform hover:scale-105 transition-transform duration-300">
+                    <div id="hours" class="text-5xl md:text-7xl font-bold mono gradient-text-2 mb-2 flip-number">00</div>
+                    <div class="text-gray-400 text-sm md:text-base uppercase tracking-widest">时 Hours</div>
+                </div>
+                
+                <!-- 分 -->
+                <div class="glass rounded-3xl p-6 md:p-8 text-center transform hover:scale-105 transition-transform duration-300">
+                    <div id="minutes" class="text-5xl md:text-7xl font-bold mono text-cyan-400 mb-2 flip-number">00</div>
+                    <div class="text-gray-400 text-sm md:text-base uppercase tracking-widest">分 Minutes</div>
+                </div>
+                
+                <!-- 秒 -->
+                <div class="glass rounded-3xl p-6 md:p-8 text-center transform hover:scale-105 transition-transform duration-300 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-t from-indigo-600/20 to-transparent"></div>
+                    <div id="seconds" class="text-5xl md:text-7xl font-bold mono text-pink-400 mb-2 flip-number relative z-10">00</div>
+                    <div class="text-gray-400 text-sm md:text-base uppercase tracking-widest relative z-10">秒 Seconds</div>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="w-full max-w-3xl mb-8">
+                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>进度 Progress</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-1000" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="resetCountdown()" class="btn-hover glass px-8 py-3 rounded-xl font-semibold hover:bg-white/10 transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    重置 Reset
+                </button>
+                <button onclick="toggleFullscreen()" class="btn-hover glass px-8 py-3 rounded-xl font-semibold hover:bg-white/10 transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    全屏 Fullscreen
+                </button>
+            </div>
+        </div>
+
+        <!-- 完成提示 -->
+        <div id="complete-section" class="hidden-section flex-col items-center justify-center fixed inset-0 z-50 bg-black/90 backdrop-blur-xl">
+            <div class="text-center p-8 celebrate">
+                <div class="text-8xl mb-6">🎉</div>
+                <h2 class="text-5xl md:text-7xl font-bold gradient-text mb-4">时间到！</h2>
+                <p id="complete-message" class="text-2xl text-gray-300 mb-8"></p>
+                <button onclick="resetCountdown()" class="btn-hover bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 px-12 rounded-2xl text-xl shadow-2xl hover:shadow-indigo-500/50 transition-all">
+                    开始新的倒计时
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 粒子背景系统
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 - 0.5;
+                this.opacity = Math.random() * 0.5 + 0.1;
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                
+                if (this.x > canvas.width) this.x = 0;
+                if (this.x < 0) this.x = canvas.width;
+                if (this.y > canvas.height) this.y = 0;
+                if (this.y < 0) this.y = canvas.height;
+            }
+            
+            draw() {
+                ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function initParticles() {
+            particles = [];
+            const particleCount = Math.min(window.innerWidth / 10, 100);
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+        
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制连线
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 150) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(99, 102, 241, ${0.1 * (1 - distance/150)})`;
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+            
+            requestAnimationFrame(animateParticles);
+        }
+        
+        initParticles();
+        animateParticles();
+        
+        // 倒计时逻辑
+        let countdownInterval;
+        let targetDate;
+        let startDate;
+        let eventName = '';
+        
+        // 设置默认时间为明天同一时间
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        now.setDate(now.getDate() + 1);
+        document.getElementById('target-input').value = now.toISOString().slice(0, 16);
+        
+        function setPreset(minutes) {
+            const preset = new Date();
+            preset.setMinutes(preset.getMinutes() + minutes - preset.getTimezoneOffset());
+            document.getElementById('target-input').value = preset.toISOString().slice(0, 16);
+        }
+        
+        function startCountdown() {
+            const input = document.getElementById('target-input').value;
+            eventName = document.getElementById('event-input').value || '目标时间';
+            
+            if (!input) {
+                alert('请选择一个目标时间');
+                return;
+            }
+            
+            targetDate = new Date(input);
+            startDate = new Date();
+            
+            if (targetDate <= startDate) {
+                alert('目标时间必须在未来');
+                return;
+            }
+            
+            document.getElementById('setup-section').classList.remove('visible-section');
+            document.getElementById('setup-section').classList.add('hidden-section');
+            document.getElementById('countdown-section').classList.remove('hidden-section');
+            document.getElementById('countdown-section').classList.add('visible-section');
+            
+            document.getElementById('event-display').textContent = eventName;
+            
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+        
+        function updateCountdown() {
+            const current = new Date();
+            const diff = targetDate - current;
+            
+            if (diff <= 0) {
+                completeCountdown();
+                return;
+            }
+            
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            updateNumber('days', days);
+            updateNumber('hours', hours);
+            updateNumber('minutes', minutes);
+            updateNumber('seconds', seconds);
+            
+            // 更新进度条
+            const totalDuration = targetDate - startDate;
+            const elapsed = current - startDate;
+            const progress = Math.min((elapsed / totalDuration) * 100, 100);
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('progress-text').textContent = Math.floor(progress) + '%';
+        }
+        
+        function updateNumber(id, value) {
+            const element = document.getElementById(id);
+            const formatted = String(value).padStart(2, '0');
+            if (element.textContent !== formatted) {
+                element.textContent = formatted;
+                element.classList.remove('flip-number');
+                void element.offsetWidth; // 触发重排
+                element.classList.add('flip-number');
+            }
+        }
+        
+        function completeCountdown() {
+            clearInterval(countdownInterval);
+            document.getElementById('countdown-section').classList.remove('visible-section');
+            document.getElementById('countdown-section').classList.add('hidden-section');
+            document.getElementById('complete-section').classList.remove('hidden-section');
+            document.getElementById('complete-section').classList.add('visible-section');
+            document.getElementById('complete-message').textContent = eventName + ' 已到达！';
+            
+            // 播放庆祝效果（视觉）
+            createConfetti();
+        }
+        
+        function resetCountdown() {
+            clearInterval(countdownInterval);
+            document.getElementById('countdown-section').classList.remove('visible-section');
+            document.getElementById('countdown-section').classList.add('hidden-section');
+            document.getElementById('complete-section').classList.remove('visible-section');
+            document.getElementById('complete-section').classList.add('hidden-section');
+            document.getElementById('setup-section').classList.remove('hidden-section');
+            document.getElementById('setup-section').classList.add('visible-section');
+            document.getElementById('progress-bar').style.width = '0%';
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // 简单的庆祝粒子效果
+        function createConfetti() {
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.style.position = 'fixed';
+                    div.style.left = Math.random() * 100 + 'vw';
+                    div.style.top = '-10px';
+                    div.style.width = '10px';
+                    div.style.height = '10px';
+                    div.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    div.style.borderRadius = '50%';
+                    div.style.pointerEvents = 'none';
+                    div.style.zIndex = '9999';
+                    document.body.appendChild(div);
+                    
+                    let pos = -10;
+                    let speed = Math.random() * 3 + 2;
+                    let wobble = Math.random() * 2;
+                    
+                    const fall = setInterval(() => {
+                        pos += speed;
+                        div.style.top = pos + 'px';
+                        div.style.left = parseFloat(div.style.left) + Math.sin(pos/50) * wobble + 'px';
+                        
+                        if (pos > window.innerHeight) {
+                            clearInterval(fall);
+                            div.remove();
+                        }
+                    }, 20);
+                }, i * 50);
+            }
+        }
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('countdown-section').classList.contains('visible-section')) {
+                resetCountdown();
+            }
+            if (e.key === ' ' && document.getElementById('setup-section').classList.contains('visible-section')) {
+                e.preventDefault();
+                startCountdown();
+            }
+        });
+    </script>
+</body>
+</html>
